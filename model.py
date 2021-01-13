@@ -4,13 +4,32 @@
 
 # Standard Library
 import pickle as pkl
+from enum import IntEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 # External Libraries
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+from pydantic import BaseModel, PositiveFloat, Field
+
+
+# Data Classes and Enumerations -----------------------------------------------
+
+class IrisMeasurements(BaseModel):
+    '''Length and the width of the iris flower's sepals and petals'''
+    sepal_length: float = Field(..., title='Sepal Length', ge=0, le=10)
+    sepal_width: float = Field(..., title='Sepal Width', ge=0, le=10)
+    petal_length: float = Field(..., title='Petal Length', ge=0, le=10)
+    petal_width: float = Field(..., title='Petal Width', ge=0, le=10)
+
+
+class IrisSpecies(IntEnum):
+    '''Species of Iris flower'''
+    Setosa = 0
+    Versicolor = 1
+    Virginica = 2
 
 
 # Model Class -----------------------------------------------------------------
@@ -24,64 +43,58 @@ class Model():
         'petal_length'
     ]
     response = 'species'
-    respose_encoding = {
-        'Setosa': 0,
-        'Versicolor': 1,
-        'Virginica':2
-    }
-    response_decoding = {
-        0: 'Setosa',
-        1: 'Versicolor',
-        2: 'Virginica'
-    }
 
-    def __init__(self, model: Any) -> None:
+    def __init__(self, model: Optional[Any] = None) -> None:
         self.model = model
+
+    def serialize(self, path: Union[Path,str]) -> None:
+        '''Serialize the model to a pickle file'''
+        with open(path, 'wb') as model_file:
+            pkl.dump(self.model, model_file)
+
+    def deserialize(self, path: Union[Path,str]) -> None:
+        '''Deserialize a pickled model'''
+        with open(path, 'rb') as model_file:
+            self.model = pkl.load(model_file)
 
     def design_matrix(self, data: Any) -> np.ndarray:
         '''Generate the design matrix given input data'''
         if isinstance(data, pd.DataFrame):
-            return data[self.predictors].to_numpy()
+            return data[self.predictors].to_numpy(float)
         elif isinstance(data, list):
-            return np.array([[datum.get(pred, 0.0) for pred in self.predictors]
+            return np.array([[datum.dict().get(pred, 0.0)
+                              for pred in self.predictors]
                              for datum in data], dtype=float)
         else:
             raise ValueError('data must be pandas.DataFrame or list')
 
     def response_vector(self, data: Any) -> np.ndarray:
         '''Generate the response vector given input data'''
-        encoder = self.respose_encoding.get
+        encoder = lambda x: IrisSpecies[x]
         if isinstance(data, pd.DataFrame):
-            return data[self.response].apply(encoder).to_numpy()
+            return data[self.response].apply(encoder).to_numpy(int)
         elif isinstance(data, list):
-            return np.array([[encoder(datum.get(self.response))]
-                             for datum in data], dtype=int)
+            return np.array([[encoder(datum.dict().get(self.response))]
+                              for datum in data], dtype=int)
+        else:
+            raise ValueError('data must be pandas.DataFrame or list')
 
     def fit(self, X: np.ndarray, y: np.ndarray):
         self.model.fit(X, y)
 
-    def predict_vector(self, Z: np.ndarray):
+    def predict(self, Z: np.ndarray):
         return self.model.predict(Z)
-
-    def predict_class(self, Z: np.ndarray):
-        y = self.predict_vector(Z)
-        return [self.response_decoding.get(int(yi)) for yi in y]
 
 
 # Module Functions ------------------------------------------------------------
 
 def train():
-    iris_df = pd.read_csv(Path()/'data'/'iris.csv')
-
+    data = pd.read_csv(Path()/'data'/'iris.csv')
     model = Model(xgb.XGBClassifier(n_jobs=-1, verbosity=1))
-
-    X = model.design_matrix(iris_df)
-    y = model.response_vector(iris_df)
-
+    X = model.design_matrix(data)
+    y = model.response_vector(data)
     model.fit(X, y)
-
-    with open(Path()/'model'/'demo-model.pkl', 'wb') as model_file:
-        pkl.dump(model, model_file)
+    model.serialize(Path('model')/'demo-model.pkl')
 
 
 # Script ----------------------------------------------------------------------
