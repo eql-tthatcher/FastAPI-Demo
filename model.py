@@ -81,9 +81,6 @@ class Model():
                 lambda x: [x.get(pred, 0.0) for pred in self.predictors],
                 map(lambda x: x.dict(), data)
             )), dtype=float)
-            #return np.array([[datum.dict().get(pred, 0.0)
-            #                  for pred in self.predictors]
-            #                 for datum in data], dtype=float)
         else:
             raise ValueError('data must be pandas.DataFrame or list')
 
@@ -97,8 +94,6 @@ class Model():
                 lambda x: encoder[x],
                 map(lambda x: x.dict[self.response], data)
             ), dtype=int)
-            #return np.array([[encoder[datum.dict()[self.response]]]
-            #                  for datum in data], dtype=int)
         else:
             raise ValueError('data must be pandas.DataFrame or list')
 
