@@ -1,4 +1,4 @@
-name: api_demo
+name: fastapi_demo
 channels:
   - anaconda
   - conda-forge
@@ -7,6 +7,7 @@ dependencies:
   - numpy==1.19.1
   - pandas==1.1.1
   - py-xgboost==0.90
+  - pydantic
   - python>=3.7
   - scikit-learn
   - uvicorn

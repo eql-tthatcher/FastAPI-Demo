@@ -4,7 +4,7 @@
 
 # Standard Library
 import pickle as pkl
-from enum import IntEnum
+from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -12,7 +12,7 @@ from typing import Any, Optional, Union
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from pydantic import BaseModel, PositiveFloat, Field
+from pydantic import BaseModel, Field
 
 
 # Data Classes and Enumerations -----------------------------------------------
@@ -20,16 +20,31 @@ from pydantic import BaseModel, PositiveFloat, Field
 class IrisMeasurements(BaseModel):
     '''Length and the width of the iris flower's sepals and petals'''
     sepal_length: float = Field(..., title='Sepal Length', ge=0, le=10)
-    sepal_width: float = Field(..., title='Sepal Width', ge=0, le=10)
+    sepal_width:  float = Field(..., title='Sepal Width' , ge=0, le=10)
     petal_length: float = Field(..., title='Petal Length', ge=0, le=10)
-    petal_width: float = Field(..., title='Petal Width', ge=0, le=10)
+    petal_width:  float = Field(..., title='Petal Width' , ge=0, le=10)
 
 
-class IrisSpecies(IntEnum):
-    '''Species of Iris flower'''
-    Setosa = 0
-    Versicolor = 1
-    Virginica = 2
+class IrisSpecies(str, Enum):
+    '''Species of iris plan'''
+
+    SETOSA     = ('Setosa'    , 0)
+    VERSICOLOR = ('Versicolor', 1)
+    VIRGINICA  = ('Virginica' , 2)
+
+    def __new__(self, value: str, index: int) -> None:
+        species = str.__new__(self, [value])
+        species._value_ = value
+        species.index = index
+        return species
+
+    @classmethod
+    def decoder(self):
+        return {species.index: species.value for species in self}
+
+    @classmethod
+    def encoder(self):
+        return {species.value: species.index  for species in self}
 
 
 # Model Class -----------------------------------------------------------------
@@ -62,20 +77,28 @@ class Model():
         if isinstance(data, pd.DataFrame):
             return data[self.predictors].to_numpy(float)
         elif isinstance(data, list):
-            return np.array([[datum.dict().get(pred, 0.0)
-                              for pred in self.predictors]
-                             for datum in data], dtype=float)
+            return np.array(list(map(
+                lambda x: [x.get(pred, 0.0) for pred in self.predictors],
+                map(lambda x: x.dict(), data)
+            )), dtype=float)
+            #return np.array([[datum.dict().get(pred, 0.0)
+            #                  for pred in self.predictors]
+            #                 for datum in data], dtype=float)
         else:
             raise ValueError('data must be pandas.DataFrame or list')
 
     def response_vector(self, data: Any) -> np.ndarray:
         '''Generate the response vector given input data'''
-        encoder = lambda x: IrisSpecies[x]
+        encoder = IrisSpecies.encoder()
         if isinstance(data, pd.DataFrame):
-            return data[self.response].apply(encoder).to_numpy(int)
+            return data[self.response].map(encoder).to_numpy(int)
         elif isinstance(data, list):
-            return np.array([[encoder(datum.dict().get(self.response))]
-                              for datum in data], dtype=int)
+            return np.fromiter(map(
+                lambda x: encoder[x],
+                map(lambda x: x.dict[self.response], data)
+            ), dtype=int)
+            #return np.array([[encoder[datum.dict()[self.response]]]
+            #                  for datum in data], dtype=int)
         else:
             raise ValueError('data must be pandas.DataFrame or list')
 
@@ -89,7 +112,7 @@ class Model():
 # Module Functions ------------------------------------------------------------
 
 def train():
-    data = pd.read_csv(Path()/'data'/'iris.csv')
+    data = pd.read_csv(Path('data')/'iris.csv')
     model = Model(xgb.XGBClassifier(n_jobs=-1, verbosity=1))
     X = model.design_matrix(data)
     y = model.response_vector(data)

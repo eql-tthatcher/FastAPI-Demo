@@ -1,25 +1,40 @@
-.PHONY: help environment install_environment remove_environment export_environment
+.PHONY: help environment remove dependencies model
 .DEFAULT_GOAL := help
 
-### Globals ######################################
+# Globals ---------------------------------------------------------------------
 
-PROJECT_ENV=api_demo
+PROJECT_ENV=fastapi_demo
 PYTHON=python
 
 
-### Configuration ################################
+# Configuration ---------------------------------------------------------------
+
+# Conda environment activation
+ACTIVATE_ENV:=. $$(conda info --base)/etc/profile.d/conda.sh;conda activate $(PROJECT_ENV)
 
 # Prepend Conda activation to Python
-PYTHON:=. $$(conda info --base)/etc/profile.d/conda.sh;conda activate $(PROJECT_ENV);$(PYTHON)
+PYTHON:=$(ACTIVATE_ENV);$(PYTHON)
 
 
-### Environment ##################################
+# Environment -----------------------------------------------------------------
 
-install_environment:  ## Create the demo virtual environment
+environment:  ## Create the demo virtual environment
 	conda env create --name $(PROJECT_ENV) --file="environment.yml"
 
-remove_environment:  ## Remove the demo virtual environment
+remove:  ## Remove the demo virtual environment
 	conda remove --name $(PROJECT_ENV) --all --yes
 
-export_environment:  ## Export the environment snapshot to environment.yml
+dependencies:  ## Export the environment snapshot to environment.yml
 	conda env export --name $(PROJECT_ENV) --no-builds | grep -v "^prefix:" > "environment.yml"
+
+
+# Pipeline --------------------------------------------------------------------
+
+model:  # Run the training procedure
+	$(PYTHON) model.py
+
+
+# Debugging -------------------------------------------------------------------
+
+debug:  # Run the API in debug mode
+	$(ACTIVATE_ENV);uvicorn api:APP --reload
